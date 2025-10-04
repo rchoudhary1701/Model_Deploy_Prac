@@ -1,0 +1,10 @@
+# requirements.txt
+pandas
+numpy
+scikit-learn
+xgboost
+statsmodels
+joblib
+google-cloud-storage
+kfp
+google-cloud-aiplatform
