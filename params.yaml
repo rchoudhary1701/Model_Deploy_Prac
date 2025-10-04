@@ -1,3 +1,3 @@
 # params.yaml
-project_id: "your-gcp-project-id"
-bucket_name: "your-gcs-bucket-name"
+project_id: "ms-forecast-twomodel-rc"
+bucket_name: " ms-forecast-bucket-372302732979"

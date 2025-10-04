@@ -1,0 +1,60 @@
+# cloudbuild.yaml
+
+steps:
+# 1. Run unit tests first to catch errors early
+- name: 'python:3.9'
+  entrypoint: 'sh'
+  args:
+  - '-c'
+  - |
+    pip install -r requirements.txt
+    pytest tests/
+
+# 2. Build the Docker image, tagging it with the unique Git commit hash
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build',
+    '-t',
+    '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}',
+    '.'
+    ]
+
+# 3. Push the versioned container image to Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'push',
+    '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
+    ]
+
+# 4. Dynamically update the pipeline definition to use the new image URI
+# This ensures the correct version of the code is used for training
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'sh'
+  args:
+  - '-c'
+  - |
+    sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
+
+# 5. Compile and trigger the Vertex AI Pipeline
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'gcloud'
+  args: [
+    'ai',
+    'pipelines',
+    'run',
+    '--region=${_REGION}',
+    '--display-name=demand-forecast-train-${SHORT_SHA}',
+    '--pipeline-spec-path=src/pipeline.py', # Cloud Build can directly use the .py file
+    '--parameter-file=params.yaml' # It's best practice to put parameters in a separate file
+    ]
+
+# Store the final image URI for reference
+images:
+- '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
+
+
+# Define variables that Cloud Build will use
+substitutions:
+  _REGION: 'europe-west1'
+  _REPO_NAME: 'forecasting-repo'
+  _IMAGE_NAME: 'demand-forecaster'
