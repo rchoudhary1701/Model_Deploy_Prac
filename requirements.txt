@@ -10,4 +10,4 @@ kfp
 google-cloud-aiplatform
 pytest
 pytest-mock
-google-cloud-resourcemanager
+google-cloud-resource-manager
