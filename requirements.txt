@@ -8,3 +8,5 @@ joblib
 google-cloud-storage
 kfp
 google-cloud-aiplatform
+pytest
+pytest-mock
