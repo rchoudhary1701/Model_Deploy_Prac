@@ -43,13 +43,15 @@ steps:
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'gcloud'
   args: [
-    'ai',
+     'ai',
     'pipelines',
     'run',
     '--region=${_REGION}',
-    '--display-name=demand-forecast-train-${SHORT_SHA}',
-    '--pipeline-spec-path=src/pipeline.py', # Cloud Build can directly use the .py file
-    '--parameter-file=params.yaml' # It's best practice to put parameters in a separate file
+    '--display-name=demand-forecast-ci-cd-run',
+    # Ensure this path is correct
+    '--pipeline-spec-path=src/pipeline.py',
+    # Ensure this file exists at the root
+    '--parameter-file=params.yaml'
     ]
 
 # Store the final image URI for reference
