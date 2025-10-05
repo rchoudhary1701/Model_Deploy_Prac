@@ -58,3 +58,7 @@ substitutions:
   _REGION: 'europe-west1'
   _REPO_NAME: 'forecasting-repo'
   _IMAGE_NAME: 'demand-forecaster'
+
+# This option fixes the logging error from before
+options:
+  logging: CLOUD_LOGGING_ONLY
