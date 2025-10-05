@@ -1,8 +1,10 @@
 from kfp.v2 import dsl
 from kfp.v2.compiler import Compiler
 from google.cloud import aiplatform
-from google.cloud import resource_manager
+# Corrected import for Resource Manager
+from google.cloud.resourcemanager_v3 import ProjectsClient
 import argparse
+import os # <-- Added missing import
 
 # --- Constants ---
 # Define your GCP project details
@@ -48,6 +50,7 @@ def register_model(
 ):
     """Uploads the trained model from GCS to the Vertex AI Model Registry."""
     from google.cloud import aiplatform
+    import os # <-- Added missing import here as well for component context
 
     aiplatform.init(project=project, location=region, staging_bucket=bucket)
 
@@ -137,7 +140,8 @@ if __name__ == '__main__':
         aiplatform.init(project=PROJECT_ID, location=REGION)
 
         # Get project number to construct service account email
-        client = resource_manager.ProjectsClient()
+        # Correctly instantiate the client
+        client = ProjectsClient()
         project_details = client.get_project(name=f"projects/{PROJECT_ID}")
         project_number = project_details.project_number
         service_account = f"{project_number}-compute@developer.gserviceaccount.com"
