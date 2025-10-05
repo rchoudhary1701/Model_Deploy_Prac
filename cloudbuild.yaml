@@ -32,12 +32,12 @@ steps:
 
 # 4. Dynamically update the pipeline definition to use the new image URI
 # This ensures the correct version of the code is used for training
-- name: 'gcr.io/google-cloud-sdk/cloud-sdk'
+- name: 'us-docker.pkg.dev/gcr-project/cloud-sdk:latest' # <-- CORRECT & MODERN IMAGE PATH
   entrypoint: 'sh'
   args:
   - '-c'
   - |
-    sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
+    sed -i "s|DOCKR_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
 
 # 5. Compile and trigger the Vertex AI Pipeline
 - name: 'gcr.io/google-cloud-sdk/cloud-sdk'
