@@ -1,12 +1,10 @@
 # cloudbuild.yaml
-#Artifact Permission granted to Cloud Build Service Account
-# gcloud artifacts repositories add-iam-policy-binding forecasting-repo
-#Logs read write Access Added to service account
-
+# A complete CI/CD pipeline for the M&S Demand Forecasting model.
 
 steps:
-# 1. Run unit tests first to catch errors early
+# Step 1: Install dependencies and run unit tests to ensure code quality.
 - name: 'python:3.9'
+  id: 'Run Tests'
   entrypoint: 'sh'
   args:
   - '-c'
@@ -14,8 +12,9 @@ steps:
     pip install -r requirements.txt
     pytest tests/
 
-# 2. Build the Docker image, tagging it with the unique Git commit hash
+# Step 2: Build the Docker image, tagging it with the unique Git commit hash for traceability.
 - name: 'gcr.io/cloud-builders/docker'
+  id: 'Build Image'
   args: [
     'build',
     '-t',
@@ -23,47 +22,51 @@ steps:
     '.'
     ]
 
-# 3. Push the versioned container image to Artifact Registry
+# Step 3: Push the versioned container image to Google Artifact Registry.
 - name: 'gcr.io/cloud-builders/docker'
+  id: 'Push Image'
   args: [
     'push',
     '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
     ]
 
-# 4. Dynamically update the pipeline definition to use the new image URI
-# This ensures the correct version of the code is used for training
-# Step 3: Dynamically update the pipeline definition
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:367.0.0-slim' # <-- PINNED to a specific version
+# Step 4: Dynamically update the pipeline definition to use the new image URI.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'Update Pipeline Spec'
   entrypoint: 'sh'
   args:
   - '-c'
   - |
     sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
 
-# Step 4: Compile and trigger the Vertex AI Pipeline
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:367.0.0-slim' # <-- PINNED to a specific version
-  entrypoint: 'gcloud'
-  args: [
-    'ai',
-    'pipelines',
-    'run',
-    '--region=${_REGION}',
-    '--display-name=demand-forecast-ci-cd-run',
-    '--pipeline-spec-path=src/pipeline.py',
-    '--parameter-file=params.yaml'
-    ]
+# Step 5: Force an update of the gcloud SDK and trigger the Vertex AI Pipeline.
+# This ensures the most recent components (including 'ai pipelines') are available.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'Trigger Pipeline'
+  entrypoint: 'sh'
+  args:
+  - '-c'
+  - |
+    echo "Forcing gcloud components update to ensure 'ai pipelines' command is available..."
+    gcloud components update
+    
+    echo "Triggering Vertex AI Pipeline..."
+    gcloud ai pipelines run \
+      --region=${_REGION} \
+      --display-name="demand-forecast-ci-cd-run-${SHORT_SHA}" \
+      --pipeline-spec-path=src/pipeline.py \
+      --parameter-file=params.yaml
 
-# Store the final image URI for reference
+# This lists the final image URI in the build artifacts for reference.
 images:
 - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
 
-
-# Define variables that Cloud Build will use
+# These are substitution variables that Cloud Build will use.
 substitutions:
   _REGION: 'europe-west1'
   _REPO_NAME: 'forecasting-repo'
   _IMAGE_NAME: 'demand-forecaster'
 
-# This option fixes the logging error from before
+# This option ensures logs are correctly streamed to Cloud Logging.
 options:
   logging: CLOUD_LOGGING_ONLY
