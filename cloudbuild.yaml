@@ -1,7 +1,7 @@
 # cloudbuild.yaml
 #Artifact Permission granted to Cloud Build Service Account
 # gcloud artifacts repositories add-iam-policy-binding forecasting-repo
-#Logs read write Access Added
+#Logs read write Access Added to service account
 
 steps:
 # 1. Run unit tests first to catch errors early
