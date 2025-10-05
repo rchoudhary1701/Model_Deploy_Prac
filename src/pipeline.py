@@ -2,6 +2,7 @@ import argparse
 from kfp.v2 import dsl
 from kfp.v2.compiler import Compiler
 from google.cloud import aiplatform
+from google.cloud import resourcemanager_v3 # Import the new library
 
 # This DOCKER_IMAGE_URI will be dynamically replaced by the Cloud Build CI/CD pipeline
 DOCKER_IMAGE_URI = "placeholder-image-uri" 
@@ -18,7 +19,6 @@ def train_stacked_model(
 ):
     """
     This component runs the main training script.
-    The Docker container already has all the logic.
     """
     import subprocess
     cmd = [
@@ -66,9 +66,15 @@ if __name__ == '__main__':
         print("Submitting pipeline job to Vertex AI...")
         aiplatform.init(project=args.project_id, location="europe-west1")
 
-        # --- THE FIX IS HERE ---
-        # Get the project number to construct the service account email
-        project_number = aiplatform.initializer.global_config.project_number
+        # --- THIS IS THE CORRECTED LOGIC ---
+        # Get the project number from the project ID using the Resource Manager client
+        print(f"Looking up project number for project ID: {args.project_id}")
+        client = resourcemanager_v3.ProjectsClient()
+        project_name = f"projects/{args.project_id}"
+        project_info = client.get_project(name=project_name)
+        # The project number is returned in the format 'projects/123456789', so we split and take the number.
+        project_number = project_info.name.split('/')[1]
+        
         SERVICE_ACCOUNT = f"{project_number}-compute@developer.gserviceaccount.com"
         print(f"Using Service Account: {SERVICE_ACCOUNT}")
 
@@ -82,7 +88,7 @@ if __name__ == '__main__':
             }
         )
         
-        # We now explicitly tell the job to run with our configured service account
+        # Explicitly tell the job to run with our configured service account
         job.run(service_account=SERVICE_ACCOUNT)
         print("Pipeline job submitted successfully.")
     else:

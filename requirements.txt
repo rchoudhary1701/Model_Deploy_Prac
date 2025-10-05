@@ -6,8 +6,8 @@ xgboost
 statsmodels
 joblib
 google-cloud-storage
-kfp
 google-cloud-aiplatform
+kfp
+google-cloud-resource-manager
 pytest
 pytest-mock
-google-cloud-resource-manager
