@@ -39,23 +39,21 @@ steps:
   - |
     sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
 
-# Step 5: Force an update of the gcloud SDK and trigger the Vertex AI Pipeline.
-# This ensures the most recent components (including 'ai pipelines') are available.
+# Step 5: Trigger the Vertex AI Pipeline using the 'beta' command.
+# This ensures the 'ai pipelines' command is available in the standard builder.
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'Trigger Pipeline'
-  entrypoint: 'sh'
-  args:
-  - '-c'
-  - |
-    echo "Forcing gcloud components update to ensure 'ai pipelines' command is available..."
-    gcloud components update
-    
-    echo "Triggering Vertex AI Pipeline..."
-    gcloud ai pipelines run \
-      --region=${_REGION} \
-      --display-name="demand-forecast-ci-cd-run-${SHORT_SHA}" \
-      --pipeline-spec-path=src/pipeline.py \
-      --parameter-file=params.yaml
+  entrypoint: 'gcloud'
+  args: [
+    'beta', # <-- Use the beta component
+    'ai',
+    'pipelines',
+    'run',
+    '--region=${_REGION}',
+    '--display-name="demand-forecast-ci-cd-run-${SHORT_SHA}"',
+    '--pipeline-spec-path=src/pipeline.py',
+    '--parameter-file=params.yaml'
+    ]
 
 # This lists the final image URI in the build artifacts for reference.
 images:
@@ -70,3 +68,4 @@ substitutions:
 # This option ensures logs are correctly streamed to Cloud Logging.
 options:
   logging: CLOUD_LOGGING_ONLY
+
