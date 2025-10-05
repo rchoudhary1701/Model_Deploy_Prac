@@ -37,23 +37,18 @@ steps:
   args:
   - '-c'
   - |
-    sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
+    sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \\\"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\\\"|" src/pipeline.py
 
-# Step 5: Trigger the Vertex AI Pipeline using the 'beta' command.
-# This ensures the 'ai pipelines' command is available in the standard builder.
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+# Step 5: Trigger the Vertex AI Pipeline using a Python script.
+# This is a more robust method than using the gcloud CLI in Cloud Build.
+- name: 'python:3.9'
   id: 'Trigger Pipeline'
-  entrypoint: 'gcloud'
-  args: [
-    'beta', # <-- Use the beta component
-    'ai',
-    'pipelines',
-    'run',
-    '--region=${_REGION}',
-    '--display-name="demand-forecast-ci-cd-run-${SHORT_SHA}"',
-    '--pipeline-spec-path=src/pipeline.py',
-    '--parameter-file=params.yaml'
-    ]
+  entrypoint: 'sh'
+  args:
+  - '-c'
+  - |
+    pip install google-cloud-aiplatform kfp --upgrade
+    python3 src/pipeline.py --project_id=${PROJECT_ID} --bucket_name=${_BUCKET_NAME_SUB} --run
 
 # This lists the final image URI in the build artifacts for reference.
 images:
@@ -64,6 +59,7 @@ substitutions:
   _REGION: 'europe-west1'
   _REPO_NAME: 'forecasting-repo'
   _IMAGE_NAME: 'demand-forecaster'
+  _BUCKET_NAME_SUB: 'ms-forecast-bucket-372302732979' # IMPORTANT: Replace with your actual bucket name
 
 # This option ensures logs are correctly streamed to Cloud Logging.
 options:

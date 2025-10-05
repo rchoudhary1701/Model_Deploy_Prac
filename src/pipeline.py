@@ -1,18 +1,14 @@
-# src/pipeline.py
+import argparse
 from kfp.v2 import dsl
 from kfp.v2.compiler import Compiler
 from google.cloud import aiplatform
 
-# Define your GCP project details
-PROJECT_ID = "your-gcp-project-id"
-REGION = "europe-west1"
-BUCKET_NAME = "your-gcs-bucket-name"
-PIPELINE_ROOT = f"gs://{BUCKET_NAME}/pipeline-root"
-DOCKER_IMAGE_URI = f"{REGION}-docker.pkg.dev/{PROJECT_ID}/forecasting-repo/demand-forecaster:latest"
+# This DOCKER_IMAGE_URI will be dynamically replaced by the Cloud Build CI/CD pipeline
+DOCKER_IMAGE_URI = "placeholder-image-uri" 
 
+# Define a pipeline component for training
 @dsl.component(
     base_image=DOCKER_IMAGE_URI,
-    packages_to_install=["google-cloud-storage", "joblib", "pandas", "numpy", "xgboost", "statsmodels"]
 )
 def train_stacked_model(
     project: str,
@@ -20,28 +16,32 @@ def train_stacked_model(
     sarima_path: str,
     xgboost_path: str
 ):
-    # This component simply runs our train.py script
-    # The base_image already contains all the logic
-    # We are just passing arguments to it
+    """
+    This component runs the main training script.
+    The Docker container already has all the logic.
+    """
     import subprocess
+    # We pass the arguments from the pipeline down to the training script
     cmd = [
         "python", "train.py",
         "--bucket-name", bucket,
         "--sarima-path", sarima_path,
         "--xgboost-path", xgboost_path
     ]
+    # This runs the command inside the container
     subprocess.run(cmd, check=True)
 
+# Define the main pipeline structure
 @dsl.pipeline(
     name="demand-forecasting-pipeline",
     description="A pipeline to train a stacked SARIMA+XGBoost model.",
-    pipeline_root=PIPELINE_ROOT,
 )
-
 def forecasting_pipeline(
-    project_id: str = PROJECT_ID,
-    bucket_name: str = BUCKET_NAME
+    project_id: str,
+    bucket_name: str,
+    region: str = "europe-west1"
 ):
+    # This is the single step in our pipeline
     train_op = train_stacked_model(
         project=project_id,
         bucket=bucket_name,
@@ -49,24 +49,42 @@ def forecasting_pipeline(
         xgboost_path="models/xgboost/xgboost_model.pkl"
     )
 
-# --- Compile and run the pipeline ---
+# This is the main entry point for the script
 if __name__ == '__main__':
+    # Set up argument parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--project_id", type=str, required=True, help="Your GCP project ID.")
+    parser.add_argument("--bucket_name", type=str, required=True, help="Your GCS bucket name.")
+    parser.add_argument("--run", action="store_true", help="Set this flag to submit the pipeline job.")
+    args = parser.parse_args()
+
+    # Define the path for the compiled pipeline JSON
+    COMPILED_PIPELINE_PATH = "forecasting_pipeline.json"
+    
+    # 1. Always compile the pipeline
+    print("Compiling pipeline...")
     Compiler().compile(
         pipeline_func=forecasting_pipeline,
-        package_path="forecasting_pipeline.json"
+        package_path=COMPILED_PIPELINE_PATH
     )
+    print(f"Pipeline compiled to {COMPILED_PIPELINE_PATH}")
 
-    aiplatform.init(project=PROJECT_ID, location=REGION)
+    # 2. Conditionally submit the pipeline job if the '--run' flag is present
+    if args.run:
+        print("Submitting pipeline job to Vertex AI...")
+        aiplatform.init(project=args.project_id, location="europe-west1")
 
-    job = aiplatform.PipelineJob(
-        display_name="demand-forecasting-pipeline-run",
-        template_path="forecasting_pipeline.json",
-        pipeline_root=PIPELINE_ROOT,
-        parameter_values={
-            "project_id": PROJECT_ID,
-            "bucket_name": BUCKET_NAME
-        }
-    )
-    print("Starting Vertex AI Pipeline job...")
-    job.run()
-    print("Job started.")
+        job = aiplatform.PipelineJob(
+            display_name="demand-forecasting-pipeline-run",
+            template_path=COMPILED_PIPELINE_PATH,
+            pipeline_root=f"gs://{args.bucket_name}/pipeline-root",
+            parameter_values={
+                "project_id": args.project_id,
+                "bucket_name": args.bucket_name
+            }
+        )
+        
+        job.run()
+        print("Pipeline job submitted successfully.")
+    else:
+        print("Compilation complete. To run the pipeline, add the --run flag.")
