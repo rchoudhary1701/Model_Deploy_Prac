@@ -32,25 +32,24 @@ steps:
 
 # 4. Dynamically update the pipeline definition to use the new image URI
 # This ensures the correct version of the code is used for training
-- name: 'us-docker.pkg.dev/gcr-project/cloud-sdk:latest' # <-- CORRECT & MODERN IMAGE PATH
+# Step 3: Dynamically update the pipeline definition
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # <-- CORRECTED STABLE IMAGE
   entrypoint: 'sh'
   args:
   - '-c'
   - |
-    sed -i "s|DOCKR_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
+    sed -i "s|DOCKER_IMAGE_URI = .*|DOCKER_IMAGE_URI = \"${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}\"|" src/pipeline.py
 
-# 5. Compile and trigger the Vertex AI Pipeline
-- name: 'gcr.io/google-cloud-sdk/cloud-sdk'
+# Step 4: Compile and trigger the Vertex AI Pipeline
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # <-- CORRECTED STABLE IMAGE
   entrypoint: 'gcloud'
   args: [
-     'ai',
+    'ai',
     'pipelines',
     'run',
     '--region=${_REGION}',
     '--display-name=demand-forecast-ci-cd-run',
-    # Ensure this path is correct
     '--pipeline-spec-path=src/pipeline.py',
-    # Ensure this file exists at the root
     '--parameter-file=params.yaml'
     ]
 
