@@ -21,14 +21,12 @@ def train_stacked_model(
     The Docker container already has all the logic.
     """
     import subprocess
-    # We pass the arguments from the pipeline down to the training script
     cmd = [
         "python", "train.py",
         "--bucket-name", bucket,
         "--sarima-path", sarima_path,
         "--xgboost-path", xgboost_path
     ]
-    # This runs the command inside the container
     subprocess.run(cmd, check=True)
 
 # Define the main pipeline structure
@@ -41,7 +39,6 @@ def forecasting_pipeline(
     bucket_name: str,
     region: str = "europe-west1"
 ):
-    # This is the single step in our pipeline
     train_op = train_stacked_model(
         project=project_id,
         bucket=bucket_name,
@@ -49,19 +46,15 @@ def forecasting_pipeline(
         xgboost_path="models/xgboost/xgboost_model.pkl"
     )
 
-# This is the main entry point for the script
 if __name__ == '__main__':
-    # Set up argument parser
     parser = argparse.ArgumentParser()
     parser.add_argument("--project_id", type=str, required=True, help="Your GCP project ID.")
     parser.add_argument("--bucket_name", type=str, required=True, help="Your GCS bucket name.")
     parser.add_argument("--run", action="store_true", help="Set this flag to submit the pipeline job.")
     args = parser.parse_args()
 
-    # Define the path for the compiled pipeline JSON
     COMPILED_PIPELINE_PATH = "forecasting_pipeline.json"
     
-    # 1. Always compile the pipeline
     print("Compiling pipeline...")
     Compiler().compile(
         pipeline_func=forecasting_pipeline,
@@ -69,10 +62,15 @@ if __name__ == '__main__':
     )
     print(f"Pipeline compiled to {COMPILED_PIPELINE_PATH}")
 
-    # 2. Conditionally submit the pipeline job if the '--run' flag is present
     if args.run:
         print("Submitting pipeline job to Vertex AI...")
         aiplatform.init(project=args.project_id, location="europe-west1")
+
+        # --- THE FIX IS HERE ---
+        # Get the project number to construct the service account email
+        project_number = aiplatform.initializer.global_config.project_number
+        SERVICE_ACCOUNT = f"{project_number}-compute@developer.gserviceaccount.com"
+        print(f"Using Service Account: {SERVICE_ACCOUNT}")
 
         job = aiplatform.PipelineJob(
             display_name="demand-forecasting-pipeline-run",
@@ -84,7 +82,9 @@ if __name__ == '__main__':
             }
         )
         
-        job.run()
+        # We now explicitly tell the job to run with our configured service account
+        job.run(service_account=SERVICE_ACCOUNT)
         print("Pipeline job submitted successfully.")
     else:
         print("Compilation complete. To run the pipeline, add the --run flag.")
+
