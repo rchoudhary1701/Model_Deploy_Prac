@@ -50,45 +50,46 @@ def train_and_save_models(bucket_name, sarima_path, xgboost_path):
     """Trains and saves both SARIMA and XGBoost models."""
     df = simulate_data()
     
-     # --- Train SARIMA ---
+    # --- (Training code remains the same) ---
     print("Training SARIMA model...")
     order = (1, 1, 1)
     seasonal_order = (1, 1, 0, 52)
     sarima_model = SARIMAX(df['sales'], order=order, seasonal_order=seasonal_order)
     sarima_fit = sarima_model.fit(disp=False)
 
-    # --- Train XGBoost ---
     print("Training XGBoost model...")
     df['sarima_forecast'] = sarima_fit.predict(start=df.index[0], end=df.index[-1])
     df['month'] = df.index.month
     df['week_of_year'] = df.index.isocalendar().week
-    
     features = ['price', 'promotion_active', 'regional_weather_C', 'sarima_forecast', 'month', 'week_of_year']
     target = 'sales'
-    
     X = df[features]
     y = df[target]
-
     xgb_reg = xgb.XGBRegressor(n_estimators=100, learning_rate=0.1, objective='reg:squarederror', n_jobs=-1)
     xgb_reg.fit(X, y)
 
-    # --- Save models locally first ---
-    joblib.dump(sarima_fit, 'sarima_model.pkl')
-    joblib.dump(xgb_reg, 'xgboost_model.pkl')
-
+    # --- Save models locally using the provided paths ---
+    # ✅ FIX: Use the path variables instead of hardcoded strings
+    print(f"Saving SARIMA model locally to: {sarima_path}")
+    joblib.dump(sarima_fit, sarima_path)
+    
+    print(f"Saving XGBoost model locally to: {xgboost_path}")
+    joblib.dump(xgb_reg, xgboost_path)
 
     # --- Upload to GCS ---
     print(f"Uploading models to GCS bucket: {bucket_name}")
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     
+    # ✅ FIX: The blob path (destination) and local file path (source) should match
     blob_sarima = bucket.blob(sarima_path)
-    blob_sarima.upload_from_filename('sarima_model.pkl')
+    blob_sarima.upload_from_filename(sarima_path)
     
     blob_xgboost = bucket.blob(xgboost_path)
-    blob_xgboost.upload_from_filename('xgboost_model.pkl')
+    blob_xgboost.upload_from_filename(xgboost_path)
 
     print("Models successfully uploaded.")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
