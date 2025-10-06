@@ -122,20 +122,22 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    if args.compile or not args.run:
-        Compiler().compile(
-            pipeline_func=forecasting_pipeline,
-            package_path="forecasting_pipeline.json"
-        )
-        print("Pipeline compiled to forecasting_pipeline.json")
+    # The script will always compile the pipeline first.
+    Compiler().compile(
+        pipeline_func=forecasting_pipeline,
+        package_path="forecasting_pipeline.json"
+    )
+    print("Pipeline compiled to forecasting_pipeline.json")
 
+    # Only run the job if the --run flag is provided.
     if args.run:
         print("Submitting pipeline job to Vertex AI...")
         aiplatform.init(project=PROJECT_ID, location=REGION)
 
         client = ProjectsClient()
         project_details = client.get_project(name=f"projects/{PROJECT_ID}")
-        project_number = project_details.project_number
+        # The project number is a property of the response object
+        project_number = project_details.name.split('/')[1] 
         service_account = f"{project_number}-compute@developer.gserviceaccount.com"
 
         job = aiplatform.PipelineJob(
